@@ -47,16 +47,19 @@ architecture logic of main is
 
 	signal rst         : std_logic;
 	signal clk_1kHz    : std_logic;
+	signal clk_gb      : std_logic;
 	
 	signal mem_address: std_logic_vector(15 downto 0);
 	signal mem_in:  std_logic_vector(7 downto 0);
 	signal mem_out: std_logic_vector(7 downto 0);
 	signal mem_wren: std_logic;
-	
-	signal debug: std_logic_vector(19 downto 0);
+
+	signal debug: std_logic_vector(35 downto 0);
+	signal led_debug: std_logic_vector(15 downto 0);
 begin
 
 	div1kHz : entity work.divider generic map(10000) port map(CLK_10MHz, '0', clk_1kHz);
+	gameboy_clock: entity clock port map(CLK_10MHz, clk_gb);
 
 	debouncer_0: entity work.pb_debouncer port map(CLK_10MHz, BTN(0), btn_debounced(0));
 	debouncer_1: entity work.pb_debouncer port map(CLK_10MHz, BTN(1), btn_debounced(1));
@@ -73,7 +76,7 @@ begin
 	ereg_a: entity work.z80_register_8 port map(CLK_10MHz, reg_out(7), reg_in(7));*/
 	
 	cpu: entity work.z80 port map(
-		clk => CLK_10MHz,
+		clk => clk_gb,
 		rst => not btn_debounced(0),
 
 		/*pc_in  => pc_in,
@@ -93,17 +96,21 @@ begin
 	);
 
 	memory: entity work.z80_memory_controller port map(
-		clk => CLK_10MHz,
+		clk => clk_gb,
 		z80_address  => mem_address,
 		z80_data_in  => mem_out,
 		z80_wren     => mem_wren,
 		z80_data_out => mem_in
 	);
 
-	LED <= not debug(19 downto 16);
+	LED <= not debug(35 downto 32);
+	
+	with btn_debounced(1) select led_debug <=
+		debug(15 downto 0) when '1',
+		debug(31 downto 16) when others;
 
 	display: entity work.multi_display port map(
-		num        => debug(15 downto 0),
+		num        => led_debug,
 		dots       => x"F",
 		clk        => clk_1kHz,
 		hex        => SEG,
